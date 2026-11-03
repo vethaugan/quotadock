@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quotadock"
+version = "0.1.0"
+description = "A small desktop home for your AI subscription limits"
+requires-python = ">=3.11"
+dependencies = ["PySide6>=6.8,<7"]
+
+[project.scripts]
+quotadock = "quotadock.app:main"
+
+[tool.setuptools.packages.find]
+include = ["quotadock*"]
