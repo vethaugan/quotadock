@@ -44,6 +44,42 @@ class Snapshot:
     fetched_at: datetime | None = None
     stale: bool = False
 
+    @property
+    def headline(self) -> Quota | None:
+        """The most constrained window: the one that will block you first."""
+        return max(self.quotas, key=lambda quota: quota.used_percent, default=None)
+
+
+def countdown_text(resets_at: datetime | None, now: datetime | None = None) -> str:
+    """Compact live countdown: '2d 14h', '3h 05m', '48m 09s'."""
+    if resets_at is None:
+        return "—"
+    seconds = int((resets_at - (now or datetime.now(timezone.utc))).total_seconds())
+    if seconds <= 0:
+        return "due"
+    days, rest = divmod(seconds, 86400)
+    hours, rest = divmod(rest, 3600)
+    minutes, seconds = divmod(rest, 60)
+    if days:
+        return f"{days}d {hours:02d}h"
+    if hours:
+        return f"{hours}h {minutes:02d}m"
+    return f"{minutes}m {seconds:02d}s"
+
+
+def percent_text(value: float) -> str:
+    """Whole percent that never rounds a partial window to empty or exhausted."""
+    shown = round(value)
+    if shown == 100 and value < 100:
+        return "99"
+    if shown == 0 and value > 0:
+        return "<1"
+    return str(shown)
+
+
+def usage_tone(used_percent: float) -> str:
+    return "critical" if used_percent >= 85 else "warning" if used_percent >= 65 else "normal"
+
 
 def parse_percent(value) -> float | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):

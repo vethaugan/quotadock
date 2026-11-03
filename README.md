@@ -2,7 +2,7 @@
 
 A small desktop overview of your remaining AI subscription quota, built for Fedora KDE.
 
-Click the system tray icon to open the overview. Pin it above other windows, resize it, or adjust its opacity. Each provider reports its own quota windows and reset times; QuotaDock does not estimate subscription quota from token counts.
+Click the system tray icon to open the overview. Pin it above other windows, resize it, adjust its opacity, or switch to a compact one-line strip. Each provider reports its own quota windows and reset times; QuotaDock does not estimate subscription quota from token counts.
 
 **Early working version:** OpenAI, Claude and Antigravity have been verified against live accounts on Fedora KDE. Legacy Gemini CLI remains a fallback; its successful live reads have not been validated.
 
@@ -29,7 +29,9 @@ Python 3.11+ and PySide6 6.8+ are required. The tested desktop uses PySide6 6.11
 ./run.sh --hidden  # start in the system tray
 ```
 
-The overview closes to the tray. Use the tray menu to quit. When unpinned, it dismisses after losing focus. The pin toggle keeps it open and above other windows. Window size, position, pinning and opacity are saved between launches.
+The overview closes to the tray. Use the tray menu to quit. When unpinned, it dismisses after losing focus. The header holds refresh (↻), connection help (?), opacity, pin and mini/full controls. Window size, position, pinning, opacity and the chosen mode are saved between launches.
+
+Each provider shows its most constrained window as the headline percentage used, followed by every window it reports with a live reset countdown. Bars turn amber at 65% used and red at 85%. Mini mode shows one column per provider with that headline window only; hover for every window. A countdown reaching zero shows `due` until the next refresh confirms the reset. The header dot is green when every provider is current and amber when a reading is stale or not connected.
 
 ## Providers and sign-in
 
