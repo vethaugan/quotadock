@@ -4,7 +4,7 @@ A small desktop overview of your remaining AI subscription quota, built for Fedo
 
 Click the system tray icon to open the overview. Pin it above other windows, resize it, or adjust its opacity. Each provider reports its own quota windows and reset times; QuotaDock does not estimate subscription quota from token counts.
 
-**Early working version:** OpenAI has been verified against a live account. Claude and Gemini adapters have parser tests, but successful live reads still need validation with signed-in accounts.
+**Early working version:** OpenAI, Claude and Antigravity have been verified against live accounts on Fedora KDE. Legacy Gemini CLI remains a fallback; its successful live reads have not been validated.
 
 ## Run
 
@@ -37,15 +37,21 @@ The overview closes to the tray. Use the tray menu to quit. When unpinned, it di
 | --- | --- | --- |
 | OpenAI | Codex app-server `account/rateLimits/read` | Install Codex CLI and run `codex login` with a subscription account. |
 | Anthropic | Claude OAuth usage endpoint | Install Claude Code and run `claude auth login`. |
-| Google | Gemini CLI / Code Assist quota endpoint | Install Gemini CLI and sign in using your Google account. |
+| Google | Antigravity quota summary; legacy Gemini CLI fallback | Open Antigravity CLI (`agy`) and sign in using your Google account. |
 
 The shared OpenAI allowance covers Codex, Work, Workspace Agents and ChatGPT for Excel for the account configuration used in initial validation. Ordinary ChatGPT chat conversations are excluded, so they are not shown as consuming this same allowance. QuotaDock displays the windows returned by OpenAI instead of assuming every plan has both a five-hour and weekly limit.
 
 Claude reads the existing access token from `~/.claude/.credentials.json`, honoring `CLAUDE_CONFIG_DIR`. When a token expires, renew your CLI sign-in and refresh. QuotaDock does not refresh or overwrite Claude's credentials.
 
-Gemini reads the existing Google access token from `~/.gemini/oauth_creds.json`. If it has expired, open Gemini CLI to renew it and then refresh QuotaDock. Encrypted/keychain credentials, API-key authentication and Vertex AI are not supported in this version. `GOOGLE_CLOUD_PROJECT` or `GOOGLE_CLOUD_PROJECT_ID` can supply a Code Assist project; otherwise the adapter asks Code Assist for the existing project. It never onboards a project or enables billing.
+Antigravity CLI uses the Linux desktop Secret Service keyring. QuotaDock reads only its `service=gemini`, `username=antigravity` item using `secret-tool` (provided by Fedora’s `libsecret` package). It does not enumerate, copy or change credentials. When the access token expires, open `agy` to renew it and refresh QuotaDock. A locked or unavailable keyring is shown as an explicit connection error. File-based Antigravity credentials and enterprise sign-ins are not supported yet.
 
-Claude and Gemini's endpoints are integration surfaces used by their clients, not a guaranteed general-purpose public subscription API. They can change or reject third-party access. Missing/unsupported values remain unavailable rather than becoming 0% used or 100% remaining.
+The Google card prioritizes Antigravity when its keyring credential is present. It reads `loadCodeAssist` and `retrieveUserQuotaSummary`, displaying shared pools such as Gemini and Claude/GPT separately, with only the windows the account reports. Missing or disabled buckets stay hidden; duplicate shared buckets are counted once. It does not combine Google’s Claude quota with an Anthropic subscription. Google currently requires an Antigravity-compatible User-Agent; QuotaDock identifies itself in its suffix. This compatibility identifier and the undocumented endpoint may need updates as Google changes its clients.
+
+If no Antigravity credential is present, the existing Gemini reader remains available. An expired or unreadable Antigravity login never silently switches to another account.
+
+Legacy Gemini reads the existing Google access token from `~/.gemini/oauth_creds.json`. If it has expired, open Gemini CLI to renew it and then refresh QuotaDock. Gemini encrypted/keychain credentials, API-key authentication and Vertex AI are not supported in this version. `GOOGLE_CLOUD_PROJECT` or `GOOGLE_CLOUD_PROJECT_ID` can supply a Code Assist project; otherwise the adapter asks Code Assist for the existing project. It never onboards a project or enables billing.
+
+Claude and Google's endpoints are integration surfaces used by their clients, not a guaranteed general-purpose public subscription API. They can change or reject third-party access. Missing/unsupported values remain unavailable rather than becoming 0% used or 100% remaining.
 
 ## Refresh and privacy
 
@@ -55,7 +61,7 @@ Claude and Gemini's endpoints are integration surfaces used by their clients, no
 - No prompts, conversation histories, or model inference requests are sent.
 - No telemetry, analytics service, or cloud backend.
 - Credentials are read locally, never copied to settings, printed, or committed.
-- Claude and Gemini credentials are sent only to their fixed provider endpoints. HTTP redirects are refused.
+- Claude and Google credentials are sent only to their fixed provider endpoints. HTTP redirects are refused.
 - Codex manages its own sign-in through its app-server child process; its normal configuration and authentication behavior still apply.
 - Preferences live in Qt's user configuration location (normally `~/.config/QuotaDock/`). Usage readings stay in memory.
 
@@ -79,8 +85,8 @@ python3 -m unittest discover -s tests -v
 
 ## Next steps
 
-- Validate successful Claude and Gemini reads with signed-in accounts.
-- Improve credential renewal and support Gemini's encrypted storage without interfering with CLI sign-ins.
+- Validate the legacy Gemini fallback with a signed-in account.
+- Improve credential renewal and add Antigravity file/enterprise sign-ins without interfering with existing CLI sign-ins.
 - Add account selection, optional autostart, and packaging.
 - Add automated interaction tests for tray dismissal and persistence.
 - Evaluate native Wayland support and additional providers.
@@ -90,7 +96,8 @@ python3 -m unittest discover -s tests -v
 - [OpenAI app-server documentation](https://learn.chatgpt.com/docs/app-server): documented rate-limit reads.
 - [Gemini CLI server](https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/code_assist/server.ts) and [response types](https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/code_assist/types.ts): quota endpoint and remaining-fraction semantics.
 - [Usage Monitor for Claude](https://github.com/jens-duttke/usage-monitor-for-claude): Claude quota integration and tray behavior.
-- [OpenUsage](https://github.com/robinebers/openusage): multi-provider quota presentation and account-oriented design.
+- [OpenUsage](https://github.com/robinebers/openusage): multi-provider quota presentation and account-oriented design; its [Antigravity usage client](https://github.com/robinebers/openusage/blob/main/Sources/OpenUsage/Providers/Antigravity/AntigravityUsageClient.swift) informed the quota-summary request protocol.
+- [Antigravity usage documentation](https://antigravity.google/docs/cli/commands/usage): model quota and reset behavior. The installed CLI and local live validation established the Linux keyring credential format.
 - [Agent Usage Analyzer](https://github.com/zm2529/agent-usage-analyze), [agentsview](https://github.com/kenn-io/agentsview), and [Agent Monitor for Claude](https://github.com/jens-duttke/agent-monitor-for-claude): adjacent usage and activity tools reviewed for context.
 - [Qt system tray](https://doc.qt.io/qt-6/qsystemtrayicon.html) and [window opacity](https://doc.qt.io/qt-6/qwidget.html#windowOpacity-prop).
 

@@ -195,13 +195,13 @@ class Overview(QMainWindow):
             return [
                 Snapshot("OpenAI", "Shared OpenAI plan", detail="Connect your Codex subscription to read its quota."),
                 Snapshot("Anthropic", "Claude", detail="Connect your Claude subscription to read its quota."),
-                Snapshot("Google", "Gemini CLI", detail="Connect your Gemini CLI subscription to read its quota."),
+                Snapshot("Google", "Antigravity CLI", detail="Connect your Antigravity subscription to read its quota."),
             ]
         now = datetime.now(timezone.utc)
         return [
             Snapshot("OpenAI", "Shared plan · Codex, Work, Agents & Excel", (Quota("Weekly", 22, now+timedelta(days=1)),), "Example", "Chat conversations are not included."),
             Snapshot("Anthropic", "Claude", (Quota("5-hour", 73, now+timedelta(minutes=48)), Quota("Weekly", 39, now+timedelta(days=2, hours=14))), "Example"),
-            Snapshot("Google", "Gemini CLI", (Quota("Daily", 18, now+timedelta(hours=11)),), "Example"),
+            Snapshot("Google", "Antigravity CLI", (Quota("Gemini · weekly", 18, now+timedelta(days=5)), Quota("Claude & GPT · weekly", 35, now+timedelta(days=5))), "Example"),
         ]
 
     def render_cards(self):
@@ -240,7 +240,7 @@ class Overview(QMainWindow):
         dialog.setInformativeText(
             "OpenAI: install Codex CLI and run `codex login`. Your shared plan quota is read through Codex app-server. Ordinary ChatGPT chats are excluded.\n\n"
             "Claude Code: run `claude auth login` if your session has expired. QuotaDock reads ~/.claude/.credentials.json (or CLAUDE_CONFIG_DIR).\n\n"
-            "Gemini CLI: install Gemini CLI and sign in with Google. QuotaDock reads ~/.gemini/oauth_creds.json; API-key and encrypted-keychain authentication are not supported yet. If its access token expires, open Gemini CLI to renew it.\n\n"
+            "Antigravity CLI: open agy and sign in with Google. QuotaDock reads its existing desktop keyring login using secret-tool. Open agy to renew an expired sign-in. Legacy Gemini CLI credentials remain a fallback when no Antigravity login is present. API-key and enterprise authentication are not supported.\n\n"
             "Refreshes run every 5 minutes. Manual refreshes have a 30-second minimum interval. Credentials are never copied to QuotaDock settings."
         )
         dialog.exec()

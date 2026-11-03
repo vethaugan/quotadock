@@ -11,7 +11,7 @@ import time
 import urllib.error
 import urllib.request
 
-from .models import Snapshot, parse_claude, parse_codex, parse_gemini
+from .models import Snapshot, parse_claude, parse_codex, parse_gemini, parse_antigravity, parse_time
 
 
 class ProviderError(Exception):
@@ -175,6 +175,72 @@ def fetch_gemini():
     return snapshot("Google", "Gemini CLI", parse_gemini(data))
 
 
+def read_antigravity_token():
+    """Read only Antigravity CLI's Linux Secret Service item, never enumerate."""
+    secret_tool = shutil.which("secret-tool")
+    if not secret_tool:
+        if shutil.which("agy"):
+            raise ProviderError("Setup needed", "Install libsecret's secret-tool to read Antigravity's desktop keyring login.")
+        return None
+    try:
+        result = subprocess.run(
+            [secret_tool, "lookup", "service", "gemini", "username", "antigravity"],
+            capture_output=True, timeout=12,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        raise ProviderError("Keyring unavailable", "Unlock your desktop keyring, then refresh Antigravity usage.") from None
+    if result.returncode:
+        # libsecret returns 1 without stderr when the exact item is absent.
+        if result.returncode == 1 and not result.stdout and not result.stderr:
+            return None
+        raise ProviderError("Keyring unavailable", "Could not read Antigravity's saved login. Unlock your desktop keyring and try again.")
+    try:
+        if len(result.stdout) > 65_536:
+            raise ValueError()
+        credentials = json.loads(result.stdout)
+        if not isinstance(credentials, dict):
+            raise ValueError()
+        if credentials.get("auth_method") not in (None, "consumer"):
+            raise ProviderError("Not supported", "This Antigravity sign-in is not a consumer subscription. Enterprise authentication is not supported yet.")
+        token_data = credentials.get("token")
+        if not isinstance(token_data, dict):
+            raise ValueError()
+        token = token_data.get("access_token")
+        if not isinstance(token, str) or not token.strip():
+            raise ValueError()
+        expiry = parse_time(token_data.get("expiry"))
+        if expiry is not None and expiry <= datetime.now(timezone.utc):
+            raise ProviderError("Sign-in needed", "Open Antigravity CLI (agy) to renew its sign-in, then refresh. QuotaDock does not modify its credentials.")
+        return token
+    except (ValueError, UnicodeError):
+        raise ProviderError("Sign-in needed", "Antigravity's saved login format was not recognized. Open agy and sign in again.") from None
+
+
+# Google's consumer quota API requires the Antigravity compatibility identifier;
+# the QuotaDock suffix identifies this integration. See OpenUsage's usage client.
+# Keep this isolated: this undocumented protocol can change independently of agy.
+ANTIGRAVITY_HEADERS = {
+    "User-Agent": "antigravity/2.24.0 (aidev_client; os_type=linux; arch=amd64) QuotaDock/0.1.0",
+}
+
+
+def fetch_google():
+    token = read_antigravity_token()
+    if token is None:
+        if (Path.home()/".gemini/oauth_creds.json").is_file():
+            return fetch_gemini()
+        raise ProviderError("Sign-in needed", "Open Antigravity CLI (agy) and sign in with Google, then refresh. No Antigravity keyring login or legacy Gemini login was found.")
+    base = "https://cloudcode-pa.googleapis.com/v1internal:"
+    info = request_json(base+"loadCodeAssist", token, {
+        "metadata": {"ideType": "ANTIGRAVITY", "platform": "PLATFORM_UNSPECIFIED", "pluginType": "GEMINI"},
+    }, ANTIGRAVITY_HEADERS)
+    project = info.get("cloudaicompanionProject")
+    if not isinstance(project, str) or not project:
+        raise ProviderError("Unavailable", "Google did not return an Antigravity quota project. Check your plan and Antigravity sign-in; the provider protocol may have changed.")
+    data = request_json(base+"retrieveUserQuotaSummary", token, {"project": project}, ANTIGRAVITY_HEADERS)
+    return snapshot("Google", "Antigravity CLI", parse_antigravity(data))
+
+
 def snapshot(provider, product, quotas, detail=""):
     return Snapshot(provider, product, quotas, "Live" if quotas else "Not reported", detail if quotas else "No percentage quota was reported for this account.", datetime.now(timezone.utc))
 
@@ -182,5 +248,5 @@ def snapshot(provider, product, quotas, detail=""):
 PROVIDERS = {
     "codex": ("OpenAI", "Shared OpenAI plan", fetch_codex),
     "claude": ("Anthropic", "Claude Code", fetch_claude),
-    "gemini": ("Google", "Gemini CLI", fetch_gemini),
+    "gemini": ("Google", "Antigravity CLI", fetch_google),
 }

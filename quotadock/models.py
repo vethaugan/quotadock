@@ -119,3 +119,42 @@ def parse_gemini(data: dict) -> tuple[Quota, ...]:
             name += f" · {bucket['tokenType']}"
         rows.append(Quota(name, round((1-fraction)*100, 4), parse_time(bucket.get("resetTime"))))
     return tuple(rows)
+
+
+def parse_antigravity(data: dict) -> tuple[Quota, ...]:
+    """Read shared quota pools, deduplicating models that share a bucket."""
+    root = data.get("response", data)
+    groups = root.get("groups") if isinstance(root, dict) else None
+    if not isinstance(groups, list):
+        return ()
+    labels = {
+        "gemini-5h": "Gemini · 5-hour", "gemini-weekly": "Gemini · weekly",
+        "3p-5h": "Claude & GPT · 5-hour", "3p-weekly": "Claude & GPT · weekly",
+    }
+    rows, seen = [], set()
+    for group in groups:
+        if not isinstance(group, dict) or not isinstance(group.get("buckets"), list):
+            continue
+        for bucket in group["buckets"]:
+            if not isinstance(bucket, dict):
+                continue
+            bucket_id = bucket.get("bucketId")
+            if not isinstance(bucket_id, str) or not bucket_id or bucket_id in seen:
+                continue
+            # An omitted flag means enabled; malformed flags must not show a quota.
+            disabled = bucket.get("disabled")
+            if disabled is not None and disabled is not False:
+                continue
+            fraction = bucket.get("remainingFraction")
+            if isinstance(fraction, bool) or not isinstance(fraction, (int, float)) or not 0 <= fraction <= 1:
+                continue
+            name = labels.get(bucket_id)
+            if name is None:
+                group_name = group.get("displayName")
+                name = group_name if isinstance(group_name, str) and group_name else bucket_id
+                window = bucket.get("window")
+                if isinstance(window, str) and window:
+                    name += f" · {window}"
+            rows.append(Quota(name, round((1-fraction)*100, 4), parse_time(bucket.get("resetTime"))))
+            seen.add(bucket_id)
+    return tuple(rows)
